@@ -25,6 +25,10 @@ endif()
 #
 # Option list
 #
+option(DEBUG                 "neural_engine: build debug"                          OFF)
+if (DEBUG)
+  add_compile_options(-g)
+endif()
 
 # general
 option(NE_STATIC                 "neural_engine: static link libraries"                          OFF)
