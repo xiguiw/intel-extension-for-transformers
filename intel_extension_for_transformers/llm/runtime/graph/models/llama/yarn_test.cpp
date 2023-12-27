@@ -20,13 +20,13 @@ int main()
 
 #ifdef TEST_INTERFACE
 
-    yarn_init(dim, max_position_embeddings, base, scale);
+    yarn yarn_inst = yarn(dim, max_position_embeddings, base, scale);
 
-    calclate_embbedding_pos(m_scale, scale,
+    yarn_inst.calculate_embbedding_pos(m_scale, scale,
             base, dim, origin_max_position_embeddings, max_position_embeddings);
 
     printf("m_scale %f\n", m_scale);
-    yarn_deinit();
+    //yarn_deinit();
 
 #else
 
@@ -56,13 +56,13 @@ int main()
     calclate_inverse_frequency(inv_freq, base, dim, 
         scale, origin_max_position_embeddings);
 
-    yarn_init(dim, max_position_embeddings, base, scale);
+    yarn yarn_inst = yarn(dim, max_position_embeddings, base, scale);
 
-    calclate_embbedding_pos(m_scale, scale,
+    yarn_inst.calculate_embbedding_pos(m_scale, scale,
             base, dim, origin_max_position_embeddings, max_position_embeddings);
 
     printf("m_scale %f\n", m_scale);
-    yarn_deinit();
+    //yarn_deinit();
 
     delete [] inv_freq;
 #endif

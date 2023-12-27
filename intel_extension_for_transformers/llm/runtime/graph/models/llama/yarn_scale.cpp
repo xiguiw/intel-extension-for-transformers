@@ -215,8 +215,8 @@ error_process:
 static float *emb_cos;
 static float *emb_sin;
 
-void
-yarn_init(int32_t dim, int32_t max_position_embeddings,
+
+yarn::yarn(int32_t dim, int32_t max_position_embeddings,
             float base, float scale,
             int32_t original_max_position_embeddings,
             float extrapolation_factor, float attn_factor,
@@ -224,6 +224,8 @@ yarn_init(int32_t dim, int32_t max_position_embeddings,
             bool finetuned) //, device=None):
 {
     //assert((int)scale * original_max_position_embeddings == max_position_embeddings);
+
+    printf("yarn initial \n");
 
     emb_cos = new float[max_position_embeddings * dim];
     if (emb_cos == NULL) {
@@ -234,11 +236,10 @@ yarn_init(int32_t dim, int32_t max_position_embeddings,
         printf("memeory new failed\n");
     }
 
-    return;
 }
 
 /* create (inverse of) position frequency matrix once at initialized stage */
-RET_TYPE calclate_embbedding_pos(float &m_scale,
+RET_TYPE yarn::calculate_embbedding_pos(float &m_scale,
                                     float scale, float base, int dim, 
                                     int32_t original_max_position_embeddings,
                                     int32_t max_position_embeddings)
@@ -260,7 +261,6 @@ RET_TYPE calclate_embbedding_pos(float &m_scale,
     }
 
     m_scale = yarn_get_mscale(scale) * attn_factor;
-
     
     RET_TYPE ret_val = calclate_inverse_frequency(inv_freq, base, dim, 
                         scale, original_max_position_embeddings);
@@ -309,9 +309,14 @@ RET_TYPE calclate_embbedding_pos(float &m_scale,
     return RET_SUCCESS;
 }
 
-void
-yarn_deinit() //float *emb_cos, float *emb_sin)
+float yarn::get_scale()
+{ 
+    return yarn_get_mscale(this->scale) * this->attn_factor;
+}
+
+yarn::~yarn() //float *emb_cos, float *emb_sin)
 {
+    printf("yarn deinitial \n");
     /* release resource */
     if (emb_cos != NULL) {
         delete [] emb_cos;
@@ -322,7 +327,6 @@ yarn_deinit() //float *emb_cos, float *emb_sin)
         emb_sin = NULL;
     }
 
-    return;
 }
 
 /***
