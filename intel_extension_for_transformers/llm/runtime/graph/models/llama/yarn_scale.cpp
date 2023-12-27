@@ -1,14 +1,11 @@
 #include <math.h>
 #include <string.h>
 #include <stdio.h>
+#include "yarn.hpp"
 
 #define PI (3.1415926)
 #define EPS (1e-6)
 
-typedef enum {
- RET_SUCCESS       = 0,
- RET_INVALID_INPUT = 1,
-} RET_TYPE;
 
 void dump_float_array(float *data, int len)
 {
@@ -124,19 +121,19 @@ inline float yarn_get_mscale(float scale=1.0)
 }
 
 
-/* create embedding table/matix once at initialized stage */
-RET_TYPE create_pos_emb_table(float *table, float &m_scale, float base, int dim, 
+/* create (inverse of) position frequency vector */
+RET_TYPE calclate_inverse_frequency(float *inv_freq,
+        float base, int dim,
         float scale, int32_t max_position_embeddings=2048)
 {
     /* not exposed factor */
     float extrapolation_factor = 1.0;
     float beta_fast = 32.0;
     float beta_slow = 1.0;
-    float attn_factor = 1.0;
 
     RET_TYPE ret_v = RET_SUCCESS;
 
-    if (table == NULL) {
+    if (inv_freq == NULL) {
         printf("null input pointer\n");
         return RET_INVALID_INPUT;
     }
@@ -146,6 +143,7 @@ RET_TYPE create_pos_emb_table(float *table, float &m_scale, float base, int dim,
     }
 
     /* create at once at initialized stage */
+    /* For GPU Verson, need to store all vector */
     float *pos_freqs = new float[dim/2];
     if (!pos_freqs)
         return RET_INVALID_INPUT;
@@ -184,14 +182,12 @@ RET_TYPE create_pos_emb_table(float *table, float &m_scale, float base, int dim,
     dump_float_array(pos_freqs, dim/2);
             
     for (int i = 0; i < dim/2; i++) {
-        table[i] = (inv_freq_in_polat[i] * (1.0 - pos_freqs[i])) +
+        inv_freq[i] = (inv_freq_in_polat[i] * (1.0 - pos_freqs[i])) +
                     inv_freq_ext_polat[i] * pos_freqs[i];
     }
 
     printf("inv_freq: ");
-    dump_float_array(table, dim/2);
-
-    m_scale = yarn_get_mscale(scale) * attn_factor;
+    dump_float_array(inv_freq, dim/2);
 
     if (ret_v != RET_SUCCESS) {
         goto error_process;
@@ -213,6 +209,120 @@ error_process:
     delete [] inv_freq_mask;
 
     return ret_v;
+}
+
+
+static float *emb_cos;
+static float *emb_sin;
+
+void
+yarn_init(int32_t dim, int32_t max_position_embeddings,
+            float base, float scale,
+            int32_t original_max_position_embeddings,
+            float extrapolation_factor, float attn_factor,
+            float beta_fast, float beta_slow,
+            bool finetuned) //, device=None):
+{
+    //assert((int)scale * original_max_position_embeddings == max_position_embeddings);
+
+    emb_cos = new float[max_position_embeddings * dim];
+    if (emb_cos == NULL) {
+        printf("memeory new failed\n");
+    }
+    emb_sin = new float[max_position_embeddings * dim];
+    if (emb_sin == NULL) {
+        printf("memeory new failed\n");
+    }
+
+    return;
+}
+
+/* create (inverse of) position frequency matrix once at initialized stage */
+RET_TYPE calclate_embbedding_pos(float &m_scale,
+                                    float scale, float base, int dim, 
+                                    int32_t original_max_position_embeddings,
+                                    int32_t max_position_embeddings)
+{
+    float attn_factor = 1.0;
+    float *inv_freq = new float[dim/2];
+    if (!inv_freq) return RET_ERROR;
+
+    int32_t scaled_pos_len = max_position_embeddings;
+
+    int32_t rows = max_position_embeddings;
+    int32_t cols = dim / 2;
+
+    float **data_cos = new float*[max_position_embeddings];
+    float **data_sin= new float*[max_position_embeddings];
+    for (int i = 0; i < max_position_embeddings; i++) {
+        data_cos[i] = emb_cos + i * dim;
+        data_sin[i] = emb_sin + i * dim;
+    }
+
+    m_scale = yarn_get_mscale(scale) * attn_factor;
+
+    
+    RET_TYPE ret_val = calclate_inverse_frequency(inv_freq, base, dim, 
+                        scale, original_max_position_embeddings);
+    if (ret_val != RET_SUCCESS) return RET_ERROR;
+
+    printf("m_scale %f\n", m_scale);
+    for (int i = 0; i < max_position_embeddings; i++) {
+        /* fill the left half cols */
+        for (int k = 0; k < cols; k++) {
+            //emb_cos[i*dim + k] = (float)i * inv_freq[k];
+            //emb_cos[i*dim + k] = cos(emb_cos[i*dim + k]) * m_scale;
+            float tmp = (float)i * inv_freq[k];
+            emb_cos[i*dim + k] = cos(tmp) * m_scale;
+            emb_sin[i*dim + k] = sin(tmp) * m_scale;
+        }
+    }
+    /* copy the left half to right half cols */
+    float *dst = emb_cos + cols;
+    float *src = emb_cos;
+    for (int i = 0; i < max_position_embeddings; i++) {
+        memcpy(dst, src, cols*sizeof(float));
+        dst += dim;
+        src += dim;
+    }
+    dst = emb_sin + cols;
+    src = emb_sin;
+    for (int i = 0; i < max_position_embeddings; i++) {
+        memcpy(dst, src, cols*sizeof(float));
+        dst += dim;
+        src += dim;
+    }
+    FILE *fp = fopen("sin_emb_bf16.txt", "w");
+    for (int i = 0; i < max_position_embeddings * dim; i++) {
+        unsigned int *int_p = (unsigned int *)(&emb_sin[i]);
+        *int_p = *int_p & 0xFFFF0000;
+        fprintf(fp, "%1.6f\n", emb_sin[i]);
+    }
+    fclose(fp);
+   
+    printf("%f", emb_cos[1234*dim + 111]);
+
+    delete []inv_freq;
+    delete [] data_cos;
+    delete [] data_sin;
+
+    return RET_SUCCESS;
+}
+
+void
+yarn_deinit() //float *emb_cos, float *emb_sin)
+{
+    /* release resource */
+    if (emb_cos != NULL) {
+        delete [] emb_cos;
+        emb_cos = NULL;
+    }
+    if (emb_sin != NULL) {
+        delete [] emb_sin;
+        emb_sin = NULL;
+    }
+
+    return;
 }
 
 /***
@@ -274,39 +384,3 @@ class LlamaYaRNScaledRotaryEmbedding(torch.nn.Module):
         self.mscale = float(_yarn_get_mscale(self.scale) * self.attn_factor) # Get n-d magnitude scaling corrected for interpolation
 ***/
 
-int main()
-{
-    float low_rot = 32.0, high_rot = 1.0;
-    int32_t dim = 128;
-    float base = 10000.0;
-    int32_t max_position_embeddings = 2048;
-    float tmp = yarn_find_correct_dim(low_rot,
-                    dim, base, max_position_embeddings);
-    int32_t low = floor(tmp);
-    float scale = 64.0; 
-
-    printf("hello, tmp %f, low = %d!\n", tmp, low);
-
-    float *inv_freq = new float[dim/2];
-    float m_scale = 0.0;
-
-    tmp = yarn_find_correct_dim(high_rot,
-                    dim, base, max_position_embeddings);
-    int32_t high = ceil(tmp);
-    printf("hello, tmp %f, high = %d!\n", tmp, high);
-
-    int32_t max, min;
-    yarn_find_correction_range(max, min,
-                low_rot, high_rot, dim,
-                base, max_position_embeddings);
-    printf("max, min  %d, %d\n", max, min);
-
-    create_pos_emb_table(inv_freq, m_scale, base, dim, 
-        scale, max_position_embeddings);
-
-    printf("m_scale %f\n", m_scale);
-
-    delete [] inv_freq;
-
-    return 0;
-}
