@@ -187,11 +187,22 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
       Kcur = ne_reshape_3d(ctx0, ne_mul_mat(ctx0, model.layers[il].attn[2], cur), head_size, n_head_kv, N);
       Vcur = ne_mul_mat(ctx0, model.layers[il].attn[2], cur);
     }
+
+    //YaRN parameter, from model input (or config.json?), use the default paramters here.
+    //const llama_cparams & cparams;
+    float ext_factor = 1.0, attn_factor = 1.0, beta_fast = 32.0, beta_slow = 1.0;
+    //float hparams.rope_scaling_factor = 0.0f; where to put it?
+    //int mode = (hparams.use_yarn == true) ? 0x8: 0x0;
+    int mode = 0x8;
+
     Qcur =
-        ne_rope_inplace(ctx0, Qcur, std::max(n_cached - N, n_past), n_rot, 0, 0, hparams.freq_base, hparams.freq_scale);
+        ne_yarn_rope_inplace(ctx0, Qcur, std::max(n_cached - N, n_past), n_rot, mode, 0, hparams.freq_base, hparams.freq_scale,
+                        hparams.original_max_position_embeddings, ext_factor, attn_factor, beta_fast, beta_slow);
+
     ne_set_name(Qcur, "Qcur");
-    Kcur = ne_rope_inplace(  // n_ctx exceeds but it will be shift-roped back with cached K
-        ctx0, Kcur, (is_ring_full ? n_ctx : n_past), n_rot, 0, 0, hparams.freq_base, hparams.freq_scale);
+    Kcur = ne_yarn_rope_inplace(  // n_ctx exceeds but it will be shift-roped back with cached K
+        ctx0, Kcur, (is_ring_full ? n_ctx : n_past), n_rot, mode, 0, hparams.freq_base, hparams.freq_scale,
+                     hparams.original_max_position_embeddings, ext_factor, attn_factor, beta_fast, beta_slow);
     ne_set_name(Kcur, "Kcur");
     Vcur = ne_transpose(ctx0, ne_reshape_2d(ctx0, Vcur, head_size * n_head_kv, N));
     ne_set_name(Vcur, "Vcur");
@@ -222,8 +233,9 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
         // Currently we only cache cossin for N == 1 in model-wide; It may be worthwhile to cache cossin for other N in
         // a single eval execution
         if (N == 1) cossin_cache = kv_self.cossin;
-        K = ne_rope_shift_inplace(ctx0, K, -N, n_rot, 0, 0, n_keep, cossin_cache, hparams.freq_base,
-                                  hparams.freq_scale);
+        K = ne_yarn_rope_shift_inplace(ctx0, K, -N, n_rot, mode, 0, n_keep, cossin_cache, hparams.freq_base,
+                                  hparams.freq_scale,
+                                  hparams.original_max_position_embeddings, ext_factor, attn_factor, beta_fast, beta_slow);
       }
       K = ne_permute(ctx0, K, 0, 2, 1, 3);
       ne_set_name(K, "K");
@@ -303,8 +315,9 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
         // Currently we only cache cossin for N == 1 in model-wide; It may be worthwhile to cache cossin for other N in
         // a single eval execution
         if (N == 1) cossin_cache = kv_self.cossin;
-        K = ne_rope_shift_inplace(ctx0, K, -N, n_rot, 0, 0, n_keep, cossin_cache, hparams.freq_base,
-                                  hparams.freq_scale);
+        K = ne_yarn_rope_shift_inplace(ctx0, K, -N, n_rot, mode, 0, n_keep, cossin_cache, hparams.freq_base,
+                                  hparams.freq_scale,
+                                  hparams.original_max_position_embeddings, ext_factor, attn_factor, beta_fast, beta_slow);
       }
       ne_set_name(K, "K");
 
