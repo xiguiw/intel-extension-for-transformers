@@ -3046,6 +3046,11 @@ struct ne_tensor* ne_yarn_rope_impl(struct ne_context* ctx, struct ne_tensor* a,
     is_node = true;
   }
 
+#ifdef DEBUG_INPUT_DATA
+  printf("n_dim %d, mode %d, freq_base %.2f, freq_scale %.4f, orig_ctx %d\n",
+         n_dims, mode, freq_base, freq_scale, yarn_orig_ctx, beta_fast, beta_slow);
+#endif
+
   struct ne_tensor* result = inplace ? ne_view_tensor(ctx, a) : ne_dup_tensor(ctx, a);
 
   ne_scratch_save(ctx);
@@ -3556,7 +3561,7 @@ static void ne_compute_forward_dump_tensor(const struct ne_compute_params* param
     } break;
   }
   fclose(file);
-  NE_ASSERT(false);
+  //NE_ASSERT(false);
 }
 // ne_compute_forward_dup
 
@@ -8001,6 +8006,13 @@ static void ne_compute_forward_rope_f32(const struct ne_compute_params* params, 
   const int64_t prompt_size = ((int32_t*)src1->data)[ROPE_PROMPTSIZE_IDX];
   const int64_t n_keep = ((int32_t*)src1->data)[ROPE_NKEEP_IDX];
 
+#ifdef DEBUG_INPUT_DATA
+  printf("n_dim %d, mode %d, freq_base %.2f, freq_scale %.4f, orig_ctx %d\n",
+         n_dims, mode, freq_base, freq_scale, n_orig_ctx, beta_fast, beta_slow);
+  printf("ext_factor %.2f, attn_factor %.2f\n",
+         ext_factor, attn_factor);
+#endif
+
   assert(n_past >= 0);
 
   NE_TENSOR_UNARY_OP_LOCALS;
@@ -8038,7 +8050,20 @@ static void ne_compute_forward_rope_f32(const struct ne_compute_params* params, 
 
   NE_ASSERT(("RoPE shift not supported!", !is_shift));
 
+#ifdef DUMP_TENSOR
+  printf("before yarn_dump_tensor\n");
+  printf("%s, %d\n", __func__, __LINE__);
+  memcpy(src0->name, "src0", 4);
+  ne_compute_forward_dump_tensor(params, src0, dst);
+#endif
+
+
   NE_ASSERT(ne3 == bs);
+#ifdef DEBUG_INPUT_DATA
+  printf("ne[3:0] %ld , %ld, %ld, %ld\n", ne3, ne2, ne1, ne0);
+  printf("src nb[3:0] %ld , %ld, %ld, %ld\n", nb03, nb02, nb01, nb00);
+  printf("dst nb[3:0] %ld , %ld, %ld, %ld\n", nb3, nb2, nb1, nb0);
+#endif
   for (int64_t i3 = 0; i3 < ne3; i3++) {
     for (int64_t i2 = (skip ? n_past : 0); i2 < ne2; i2++) {
       const int64_t p = skip ? i2 : n_past + i2;
@@ -8151,6 +8176,13 @@ static void ne_compute_forward_rope_f32(const struct ne_compute_params* params, 
       }
     }
   }
+
+#ifdef DUMP_TENSOR
+  printf("%s, %d\n", __func__, __LINE__);
+  printf("before yarn_dump_tensor\n");
+  ne_compute_forward_dump_tensor(params, dst, dst);
+  NE_ASSERT(false);
+#endif
 }
 
 static void ne_compute_forward_rope_f16(const struct ne_compute_params* params, const struct ne_tensor* src0,
