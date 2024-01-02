@@ -191,6 +191,12 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
       Kcur = ne_reshape_3d(ctx0, ne_mul_mat(ctx0, model.layers[il].attn[2], cur), head_size, n_head_kv, N);
       Vcur = ne_mul_mat(ctx0, model.layers[il].attn[4], cur);
 #else 
+      //ne_dump_tensor(ctx0, model.layers[il].attn[0]);
+      yarn_dump_tensor(model.layers[il].attn[0]);
+      ne_set_name(cur, "my_test");
+      yarn_dump_tensor(cur);
+      NE_ASSERT(false);
+
       struct ne_tensor* tmp_mul = ne_mul_mat(ctx0, model.layers[il].attn[0], cur);
       tmp_mul = ne_add_inplace(ctx0, tmp_mul, model.layers[il].attn[1]);
       Qcur = ne_reshape_3d(ctx0, tmp_mul, head_size, n_head, N);
@@ -204,7 +210,7 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
     }
 
     //printf("before yarn_dump_tensor\n");
-    //memcpy(cur->name, "cur", 3);
+    //ne_set_name(cur, "Qcur");
     //yarn_dump_tensor(model.layers[il].attn[0]);
     //yarn_dump_tensor(cur);
     //NE_ASSERT(false);
