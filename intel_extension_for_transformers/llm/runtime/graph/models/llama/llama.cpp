@@ -42,6 +42,8 @@
 #include "models/model_utils/util.h"
 #include "models/models.h"
 
+#include "debug_utils.h"
+
 // evaluate the transformer
 //
 //   - lctx:      model context
@@ -183,10 +185,29 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
       Kcur = ne_reshape_3d(ctx0, ne_view_1d(ctx0, QKVcur, qkv_size, 1 * qkv_bytes), head_size, n_head_kv, N);
       Vcur = ne_view_1d(ctx0, QKVcur, qkv_size, 2 * qkv_bytes);
     } else {
+      //implement this branch
+#if 0
       Qcur = ne_reshape_3d(ctx0, ne_mul_mat(ctx0, model.layers[il].attn[0], cur), head_size, n_head, N);
       Kcur = ne_reshape_3d(ctx0, ne_mul_mat(ctx0, model.layers[il].attn[2], cur), head_size, n_head_kv, N);
-      Vcur = ne_mul_mat(ctx0, model.layers[il].attn[2], cur);
+      Vcur = ne_mul_mat(ctx0, model.layers[il].attn[4], cur);
+#else 
+      struct ne_tensor* tmp_mul = ne_mul_mat(ctx0, model.layers[il].attn[0], cur);
+      tmp_mul = ne_add_inplace(ctx0, tmp_mul, model.layers[il].attn[1]);
+      Qcur = ne_reshape_3d(ctx0, tmp_mul, head_size, n_head, N);
+
+      struct ne_tensor* tmp_k = ne_mul_mat(ctx0, model.layers[il].attn[2], cur);
+      tmp_k = ne_add_inplace(ctx0, tmp_k, model.layers[il].attn[1]);
+      Kcur = ne_reshape_3d(ctx0, tmp_k, head_size, n_head_kv, N);
+
+      Vcur = ne_mul_mat(ctx0, model.layers[il].attn[4], cur);
+#endif
     }
+
+    //printf("before yarn_dump_tensor\n");
+    //memcpy(cur->name, "cur", 3);
+    //yarn_dump_tensor(model.layers[il].attn[0]);
+    //yarn_dump_tensor(cur);
+    //NE_ASSERT(false);
 
     //YaRN parameter, from model input (or config.json?), use the default paramters here.
     //const llama_cparams & cparams;
