@@ -192,17 +192,17 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
       Vcur = ne_mul_mat(ctx0, model.layers[il].attn[4], cur);
 #else 
       //ne_dump_tensor(ctx0, model.layers[il].attn[0]);
-      yarn_dump_tensor(model.layers[il].attn[0]);
-      ne_set_name(cur, "my_test");
-      yarn_dump_tensor(cur);
-      NE_ASSERT(false);
+      //yarn_dump_tensor(model.layers[il].attn[0]);
+      //ne_set_name(cur, "my_test");
+      //yarn_dump_tensor(cur);
+      //NE_ASSERT(false);
 
       struct ne_tensor* tmp_mul = ne_mul_mat(ctx0, model.layers[il].attn[0], cur);
       tmp_mul = ne_add_inplace(ctx0, tmp_mul, model.layers[il].attn[1]);
       Qcur = ne_reshape_3d(ctx0, tmp_mul, head_size, n_head, N);
 
       struct ne_tensor* tmp_k = ne_mul_mat(ctx0, model.layers[il].attn[2], cur);
-      tmp_k = ne_add_inplace(ctx0, tmp_k, model.layers[il].attn[1]);
+      tmp_k = ne_add_inplace(ctx0, tmp_k, model.layers[il].attn[3]);
       Kcur = ne_reshape_3d(ctx0, tmp_k, head_size, n_head_kv, N);
 
       Vcur = ne_mul_mat(ctx0, model.layers[il].attn[4], cur);
@@ -223,7 +223,7 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
     int mode = 0x8;
 
     Qcur =
-        ne_yarn_rope_inplace(ctx0, Qcur, std::max(n_cached - N, n_past), n_rot, mode, 0, hparams.freq_base, hparams.freq_scale,
+        ne_yarn_rope_inplace(ctx0, Qcur, std::max(n_cached - N, n_past), n_rot, mode, 0, hparams.freq_base, hparams.rope_scaling_factor,
                         hparams.original_max_position_embeddings, ext_factor, attn_factor, beta_fast, beta_slow);
 
     ne_set_name(Qcur, "Qcur");
@@ -308,6 +308,7 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
 
       // projection (no bias)
       cur = ne_mul_mat(ctx0, model.layers[il].attn[6], cur);
+      cur = ne_add_inplace(ctx0, cur, model.layers[il].attn[7]);
     } else {
       const auto k_size = kv_cache_info.k_bytes;
       const auto v_size = kv_cache_info.v_bytes;
