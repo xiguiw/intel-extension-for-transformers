@@ -146,9 +146,20 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
 
   struct ne_tensor* embd = ne_new_tensor_1d(ctx0, NE_TYPE_I32, N, NE_SIZE_CALC);
   ne_set_name(embd, "embd");
+  printf("inputs->tokens %d\n", *(inputs->tokens));
+
+  for (int i = 0; i < N; ++i) {
+    printf("tokens: %d\t", inputs->tokens[i]);
+  }
   for (int i = 0; i < batch_size; ++i) {
     memcpy(static_cast<model_token*>(embd->data) + i * N, (inputs + i)->tokens, N * ne_element_size(embd));
   }
+
+  int *p = (int *)embd->data;
+  p[0] = 31373;
+  p[1] = 995;
+  printf("\n ***embd data tokens: %d %d\n", p[0], p[1]);
+
 
 #ifdef NE_TP_MODEL
   if (enable_tp) {
