@@ -7984,7 +7984,7 @@ void ggml_rope_yarn_corr_dims(
   NE_TENSOR_LOCALS(size_t, nb, dst, nb);
 
 //#define DEBUG_INPUT_DATA
-//#define DEBUG_DUMP_TENSOR
+#define YARN_DUMP_TENSOR
 static void ne_compute_forward_rope_f32(const struct ne_compute_params* params, const struct ne_tensor* src0,
                                         const struct ne_tensor* src1, struct ne_tensor* dst) {
   if (params->type == NE_TASK_INIT || params->type == NE_TASK_FINALIZE) {
@@ -8053,7 +8053,7 @@ static void ne_compute_forward_rope_f32(const struct ne_compute_params* params, 
 
   NE_ASSERT(("RoPE shift not supported!", !is_shift));
 
-#ifdef DEBUG_DUMP_TENSOR
+#ifdef YARN_DUMP_TENSOR
   static int count = 0;
   if (count < 2)
   {
@@ -8196,7 +8196,7 @@ static void ne_compute_forward_rope_f32(const struct ne_compute_params* params, 
     }
   }
 
-#ifdef DEBUG_DUMP_TENSOR
+#ifdef YARN_DUMP_TENSOR
   printf("%s, %d\n", __func__, __LINE__);
   printf("before yarn_dump_tensor\n");
   ne_compute_forward_dump_tensor(params, dst, dst);

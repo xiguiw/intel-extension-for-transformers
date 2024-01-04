@@ -217,6 +217,7 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
       Kcur = ne_reshape_3d(ctx0, tmp_k, head_size, n_head_kv, N);
 
       Vcur = ne_mul_mat(ctx0, model.layers[il].attn[4], cur);
+      Vcur = ne_add_inplace(ctx0, Vcur, model.layers[il].attn[5]);
 #endif
     }
 
