@@ -7939,7 +7939,7 @@ static void ne_compute_forward_clamp(const struct ne_compute_params* params, con
 
 static float rope_yarn_ramp(const float low, const float high, const int i0) {
     const float y = (i0 / 2 - low) / MAX(0.001f, high - low);
-    return 1 - MIN(1, MAX(0, y));
+    return 1.0 - MIN(1.0, MAX(0.0, y));
 }
 
 // YaRN algorithm based on LlamaYaRNScaledRotaryEmbedding.py from https://github.com/jquesnelle/yarn
@@ -7984,7 +7984,7 @@ void ggml_rope_yarn_corr_dims(
   NE_TENSOR_LOCALS(size_t, nb, dst, nb);
 
 //#define DEBUG_INPUT_DATA
-#define YARN_DUMP_TENSOR
+//#define YARN_DUMP_TENSOR
 static void ne_compute_forward_rope_f32(const struct ne_compute_params* params, const struct ne_tensor* src0,
                                         const struct ne_tensor* src1, struct ne_tensor* dst) {
   if (params->type == NE_TASK_INIT || params->type == NE_TASK_FINALIZE) {
@@ -8057,9 +8057,6 @@ static void ne_compute_forward_rope_f32(const struct ne_compute_params* params, 
   static int count = 0;
   if (count < 2)
   {
-    printf("%s, %d\n",  __func__, __LINE__);
-    printf("src name %s\n",  ne_get_name(src0));
-    printf("dst name %s\n",  ne_get_name(dst));
     count++;
   }
   else
@@ -8075,7 +8072,6 @@ static void ne_compute_forward_rope_f32(const struct ne_compute_params* params, 
   printf("%s\n", name);
   ne_compute_forward_dump_tensor(params, src0, dst);
 #endif
-
 
   NE_ASSERT(ne3 == bs);
 #ifdef DEBUG_INPUT_DATA
@@ -8197,8 +8193,13 @@ static void ne_compute_forward_rope_f32(const struct ne_compute_params* params, 
   }
 
 #ifdef YARN_DUMP_TENSOR
+  static int test = 0;
+  test++;
   printf("%s, %d\n", __func__, __LINE__);
   printf("before yarn_dump_tensor\n");
+  if (dst->name == NULL) {
+    ne_set_name(dst, 'dst');
+  }
   ne_compute_forward_dump_tensor(params, dst, dst);
   //NE_ASSERT(false);
 #endif

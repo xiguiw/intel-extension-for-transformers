@@ -146,19 +146,23 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
 
   struct ne_tensor* embd = ne_new_tensor_1d(ctx0, NE_TYPE_I32, N, NE_SIZE_CALC);
   ne_set_name(embd, "embd");
-  printf("inputs->tokens %d\n", *(inputs->tokens));
 
   for (int i = 0; i < N; ++i) {
     printf("tokens: %d\t", inputs->tokens[i]);
   }
+  printf("\n");
   for (int i = 0; i < batch_size; ++i) {
     memcpy(static_cast<model_token*>(embd->data) + i * N, (inputs + i)->tokens, N * ne_element_size(embd));
   }
 
-  int *p = (int *)embd->data;
-  p[0] = 31373;
-  p[1] = 995;
-  printf("\n ***embd data tokens: %d %d\n", p[0], p[1]);
+  static bool initialzied_token = false;
+  if (!initialzied_token) {
+    int *p = (int *)embd->data;
+    p[0] = 31373;
+    p[1] = 995;
+    printf("\n ***embd data tokens: %d %d\n", p[0], p[1]);
+    initialzied_token = true;
+  }
 
 
 #ifdef NE_TP_MODEL
@@ -209,15 +213,18 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
       //NE_ASSERT(false);
 
       struct ne_tensor* tmp_mul = ne_mul_mat(ctx0, model.layers[il].attn[0], cur);
-      tmp_mul = ne_add_inplace(ctx0, tmp_mul, model.layers[il].attn[1]);
+      ne_set_name(tmp_mul, "Query");
+      //tmp_mul = ne_add_inplace(ctx0, tmp_mul, model.layers[il].attn[1]);
       Qcur = ne_reshape_3d(ctx0, tmp_mul, head_size, n_head, N);
 
       struct ne_tensor* tmp_k = ne_mul_mat(ctx0, model.layers[il].attn[2], cur);
-      tmp_k = ne_add_inplace(ctx0, tmp_k, model.layers[il].attn[3]);
+      ne_set_name(tmp_k, "Key");
+      //tmp_k = ne_add_inplace(ctx0, tmp_k, model.layers[il].attn[3]);
       Kcur = ne_reshape_3d(ctx0, tmp_k, head_size, n_head_kv, N);
 
       Vcur = ne_mul_mat(ctx0, model.layers[il].attn[4], cur);
-      Vcur = ne_add_inplace(ctx0, Vcur, model.layers[il].attn[5]);
+      ne_set_name(Vcur, "Value");
+      //Vcur = ne_add_inplace(ctx0, Vcur, model.layers[il].attn[5]);
 #endif
     }
 
@@ -234,17 +241,20 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
     //int mode = (hparams.use_yarn == true) ? 0x8: 0x0;
     int mode = 0x8;
 
+    ne_set_name(Qcur, "Qcur");
     Qcur =
         ne_yarn_rope_inplace(ctx0, Qcur, std::max(n_cached - N, n_past), n_rot, mode, 0, hparams.freq_base, hparams.rope_scaling_factor,
                         hparams.original_max_position_embeddings, ext_factor, attn_factor, beta_fast, beta_slow);
+    ne_set_name(Qcur, "Qcurdst");
 
-    ne_set_name(Qcur, "Qcur");
-    Kcur = ne_yarn_rope_inplace(  // n_ctx exceeds but it will be shift-roped back with cached K
-        ctx0, Kcur, (is_ring_full ? n_ctx : n_past), n_rot, mode, 0, hparams.freq_base, hparams.freq_scale,
-                     hparams.original_max_position_embeddings, ext_factor, attn_factor, beta_fast, beta_slow);
     ne_set_name(Kcur, "Kcur");
-    Vcur = ne_transpose(ctx0, ne_reshape_2d(ctx0, Vcur, head_size * n_head_kv, N));
+    Kcur = ne_yarn_rope_inplace(  // n_ctx exceeds but it will be shift-roped back with cached K
+        ctx0, Kcur, (is_ring_full ? n_ctx : n_past), n_rot, mode, 0, hparams.freq_base, hparams.rope_scaling_factor,
+                     hparams.original_max_position_embeddings, ext_factor, attn_factor, beta_fast, beta_slow);
+    ne_set_name(Kcur, "Kcurdst");
+
     ne_set_name(Vcur, "Vcur");
+    Vcur = ne_transpose(ctx0, ne_reshape_2d(ctx0, Vcur, head_size * n_head_kv, N));
     // self-attention
     const float attn_scale = 1.0f / sqrtf(static_cast<float>(head_size));
     if (!run_mha_reordered) {
@@ -273,7 +283,7 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
         // a single eval execution
         if (N == 1) cossin_cache = kv_self.cossin;
         K = ne_yarn_rope_shift_inplace(ctx0, K, -N, n_rot, mode, 0, n_keep, cossin_cache, hparams.freq_base,
-                                  hparams.freq_scale,
+                                  hparams.rope_scaling_factor,
                                   hparams.original_max_position_embeddings, ext_factor, attn_factor, beta_fast, beta_slow);
       }
       K = ne_permute(ctx0, K, 0, 2, 1, 3);
@@ -320,7 +330,7 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
 
       // projection (no bias)
       cur = ne_mul_mat(ctx0, model.layers[il].attn[6], cur);
-      cur = ne_add_inplace(ctx0, cur, model.layers[il].attn[7]);
+      //cur = ne_add_inplace(ctx0, cur, model.layers[il].attn[7]);
     } else {
       const auto k_size = kv_cache_info.k_bytes;
       const auto v_size = kv_cache_info.v_bytes;
@@ -356,7 +366,7 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
         // a single eval execution
         if (N == 1) cossin_cache = kv_self.cossin;
         K = ne_yarn_rope_shift_inplace(ctx0, K, -N, n_rot, mode, 0, n_keep, cossin_cache, hparams.freq_base,
-                                  hparams.freq_scale,
+                                  hparams.rope_scaling_factor,
                                   hparams.original_max_position_embeddings, ext_factor, attn_factor, beta_fast, beta_slow);
       }
       ne_set_name(K, "K");
