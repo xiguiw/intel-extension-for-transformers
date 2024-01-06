@@ -214,17 +214,17 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
 
       struct ne_tensor* tmp_mul = ne_mul_mat(ctx0, model.layers[il].attn[0], cur);
       ne_set_name(tmp_mul, "Query");
-      //tmp_mul = ne_add_inplace(ctx0, tmp_mul, model.layers[il].attn[1]);
+      tmp_mul = ne_add_inplace(ctx0, tmp_mul, model.layers[il].attn[1]);
       Qcur = ne_reshape_3d(ctx0, tmp_mul, head_size, n_head, N);
 
       struct ne_tensor* tmp_k = ne_mul_mat(ctx0, model.layers[il].attn[2], cur);
       ne_set_name(tmp_k, "Key");
-      //tmp_k = ne_add_inplace(ctx0, tmp_k, model.layers[il].attn[3]);
+      tmp_k = ne_add_inplace(ctx0, tmp_k, model.layers[il].attn[3]);
       Kcur = ne_reshape_3d(ctx0, tmp_k, head_size, n_head_kv, N);
 
       Vcur = ne_mul_mat(ctx0, model.layers[il].attn[4], cur);
       ne_set_name(Vcur, "Value");
-      //Vcur = ne_add_inplace(ctx0, Vcur, model.layers[il].attn[5]);
+      Vcur = ne_add_inplace(ctx0, Vcur, model.layers[il].attn[5]);
 #endif
     }
 
@@ -330,7 +330,7 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
 
       // projection (no bias)
       cur = ne_mul_mat(ctx0, model.layers[il].attn[6], cur);
-      //cur = ne_add_inplace(ctx0, cur, model.layers[il].attn[7]);
+      cur = ne_add_inplace(ctx0, cur, model.layers[il].attn[7]);
     } else {
       const auto k_size = kv_cache_info.k_bytes;
       const auto v_size = kv_cache_info.v_bytes;

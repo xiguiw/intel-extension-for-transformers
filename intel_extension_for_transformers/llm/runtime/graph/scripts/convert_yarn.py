@@ -130,7 +130,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
         list_vars[name].requires_grad = False
         src = name
         nn = name
-        if 'self_attn.q_proj.weight' in src or 'self_attn.k_proj.weight' in src:
+        if 'self_attn.q_proj.weight' in src or 'self_attn.k_proj.weight' in src or 'self_attn.q_proj.bias' in src or 'self_attn.k_proj.bias' in src:
             shape = list_vars[src].shape
             n_head = hparams["num_attention_heads"]
             list_vars[src]=list_vars[src].reshape(n_head,2,shape[0]//n_head//2,*shape[1:]).transpose(1,2).reshape(shape)
