@@ -59,10 +59,10 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
   const int n_past = inputs->n_past;
   const int n_total = inputs->n_total;
   // enforce that the first token is BOS
-  if (n_total == 0 && inputs->tokens[0] != lctx.vocab.bos_token_id) {
-    fprintf(stderr, "%s: first token must be BOS\n", __func__);
-    return false;
-  }
+  //if (n_total == 0 && inputs->tokens[0] != lctx.vocab.bos_token_id) {
+    //fprintf(stderr, "%s: first token must be BOS\n", __func__);
+    //return false;
+  //}
 
   const int batch_size = lctx.batch_size;
   MODEL_ASSERT(batch_size == n_input);
@@ -147,14 +147,18 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
   struct ne_tensor* embd = ne_new_tensor_1d(ctx0, NE_TYPE_I32, N, NE_SIZE_CALC);
   ne_set_name(embd, "embd");
 
+#ifdef DEBUG_INPUT
   for (int i = 0; i < N; ++i) {
     printf("tokens: %d\t", inputs->tokens[i]);
   }
   printf("\n");
+#endif
+
   for (int i = 0; i < batch_size; ++i) {
     memcpy(static_cast<model_token*>(embd->data) + i * N, (inputs + i)->tokens, N * ne_element_size(embd));
   }
 
+#ifdef DEBUG_INPUT
   static bool initialzied_token = false;
   if (!initialzied_token) {
     int *p = (int *)embd->data;
@@ -163,7 +167,7 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
     printf("\n ***embd data tokens: %d %d\n", p[0], p[1]);
     initialzied_token = true;
   }
-
+#endif
 
 #ifdef NE_TP_MODEL
   if (enable_tp) {
@@ -227,12 +231,6 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
       Vcur = ne_add_inplace(ctx0, Vcur, model.layers[il].attn[5]);
 #endif
     }
-
-    //printf("before yarn_dump_tensor\n");
-    //ne_set_name(cur, "Qcur");
-    //yarn_dump_tensor(model.layers[il].attn[0]);
-    //yarn_dump_tensor(cur);
-    //NE_ASSERT(false);
 
     //YaRN parameter, from model input (or config.json?), use the default paramters here.
     //const llama_cparams & cparams;
