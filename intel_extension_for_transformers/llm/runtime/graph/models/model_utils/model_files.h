@@ -285,6 +285,12 @@ struct model_file_loader {
     file.read_raw(&hparams.rms_norm_eps, sizeof(float));
     file.read_raw(&hparams.freq_base, sizeof(float));
     file.read_raw(&hparams.freq_scale, sizeof(float));
+    
+    file.read_raw(&hparams.rope_scaling_factor, sizeof(float));
+    hparams.original_max_position_embeddings = file.read_u32();
+    hparams.use_yarn = file.read_u32();
+    // file.read_raw(&hparams.rope_scaling_factor, sizeof(float));
+    
   }
 
   void read_vocab() {
@@ -405,6 +411,9 @@ struct model_file_saver {
     file.write_raw(&hparams.rms_norm_eps, sizeof(float));
     file.write_raw(&hparams.freq_base, sizeof(float));
     file.write_raw(&hparams.freq_scale, sizeof(float));
+    file.write_raw(&hparams.rope_scaling_factor, sizeof(float));
+    file.write_u32(hparams.original_max_position_embeddings);
+    file.write_u32(hparams.use_yarn);
   }
   void write_vocab() {
     if (any_file_loader->file_version == MODEL_FILE_VERSION_NE) {
