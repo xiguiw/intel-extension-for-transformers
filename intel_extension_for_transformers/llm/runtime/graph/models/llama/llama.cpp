@@ -42,8 +42,6 @@
 #include "models/model_utils/util.h"
 #include "models/models.h"
 
-#include "debug_utils.h"
-
 // evaluate the transformer
 //
 //   - lctx:      model context
@@ -147,6 +145,7 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
   struct ne_tensor* embd = ne_new_tensor_1d(ctx0, NE_TYPE_I32, N, NE_SIZE_CALC);
   ne_set_name(embd, "embd");
 
+#define DEBUG_INPUT
 #ifdef DEBUG_INPUT
   for (int i = 0; i < N; ++i) {
     printf("tokens: %d\t", inputs->tokens[i]);
@@ -238,15 +237,16 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
     //float hparams.rope_scaling_factor = 0.0f; where to put it?
     //int mode = (hparams.use_yarn == true) ? 0x8: 0x0;
     int mode = 0x8;
+    printf("n origi ctx = %d \n", hparams.original_max_position_embeddings);
 
     ne_set_name(Qcur, "Qcur");
     Qcur =
-        ne_yarn_rope_inplace(ctx0, Qcur, std::max(n_cached - N, n_past), n_rot, mode, 0, hparams.freq_base, hparams.rope_scaling_factor,
+        ne_rope_custom_inplace(ctx0, Qcur, std::max(n_cached - N, n_past), n_rot, mode, 0, hparams.freq_base, hparams.rope_scaling_factor,
                         hparams.original_max_position_embeddings, ext_factor, attn_factor, beta_fast, beta_slow);
     ne_set_name(Qcur, "Qcurdst");
 
     ne_set_name(Kcur, "Kcur");
-    Kcur = ne_yarn_rope_inplace(  // n_ctx exceeds but it will be shift-roped back with cached K
+    Kcur = ne_rope_custom_inplace(  // n_ctx exceeds but it will be shift-roped back with cached K
         ctx0, Kcur, (is_ring_full ? n_ctx : n_past), n_rot, mode, 0, hparams.freq_base, hparams.rope_scaling_factor,
                      hparams.original_max_position_embeddings, ext_factor, attn_factor, beta_fast, beta_slow);
     ne_set_name(Kcur, "Kcurdst");
@@ -280,7 +280,7 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
         // Currently we only cache cossin for N == 1 in model-wide; It may be worthwhile to cache cossin for other N in
         // a single eval execution
         if (N == 1) cossin_cache = kv_self.cossin;
-        K = ne_yarn_rope_shift_inplace(ctx0, K, -N, n_rot, mode, 0, n_keep, cossin_cache, hparams.freq_base,
+        K = ne_rope_custom_shift_inplace(ctx0, K, -N, n_rot, mode, 0, n_keep, cossin_cache, hparams.freq_base,
                                   hparams.rope_scaling_factor,
                                   hparams.original_max_position_embeddings, ext_factor, attn_factor, beta_fast, beta_slow);
       }
@@ -363,7 +363,7 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
         // Currently we only cache cossin for N == 1 in model-wide; It may be worthwhile to cache cossin for other N in
         // a single eval execution
         if (N == 1) cossin_cache = kv_self.cossin;
-        K = ne_yarn_rope_shift_inplace(ctx0, K, -N, n_rot, mode, 0, n_keep, cossin_cache, hparams.freq_base,
+        K = ne_rope_custom_shift_inplace(ctx0, K, -N, n_rot, mode, 0, n_keep, cossin_cache, hparams.freq_base,
                                   hparams.rope_scaling_factor,
                                   hparams.original_max_position_embeddings, ext_factor, attn_factor, beta_fast, beta_slow);
       }

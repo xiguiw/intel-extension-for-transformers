@@ -2980,64 +2980,9 @@ struct ne_tensor* ne_soft_max_inplace(struct ne_context* ctx, struct ne_tensor* 
 
 struct ne_tensor* ne_rope_impl(struct ne_context* ctx, struct ne_tensor* a, int n_past, int n_dims, int mode,
                                int prompt_size, bool inplace, int n_keep, struct ne_tensor* cossin, int* n_padding,
-                               bool padding_left, float freq_base, float freq_scale) {
-  NE_ASSERT(n_past >= 0 || n_keep >= 0);
-  NE_ASSERT(padding_left);
-  bool is_node = false;
-
-  if (!inplace && a->grad) {
-    is_node = true;
-  }
-
-  struct ne_tensor* result = inplace ? ne_view_tensor(ctx, a) : ne_dup_tensor(ctx, a);
-
-  ne_scratch_save(ctx);
-
-#define ROPE_PARAMS_NUM 5
-#define ROPE_NPAST_IDX 0
-#define ROPE_NDIMS_IDX 1
-#define ROPE_MODE_IDX 2
-#define ROPE_PROMPTSIZE_IDX 3
-#define ROPE_NKEEP_IDX 4
-#define ROPE_PADDING_IDX 5
-
-  const int bs = a->ne[3];
-  struct ne_tensor* b = ne_new_tensor_1d(ctx, NE_TYPE_I32, ROPE_PARAMS_NUM + bs, NE_SIZE_CALC);
-
-  ((int32_t*)b->data)[ROPE_NPAST_IDX] = n_past;
-  ((int32_t*)b->data)[ROPE_NDIMS_IDX] = n_dims;
-  ((int32_t*)b->data)[ROPE_MODE_IDX] = mode;
-  ((int32_t*)b->data)[ROPE_PROMPTSIZE_IDX] = prompt_size;
-  ((int32_t*)b->data)[ROPE_NKEEP_IDX] = n_keep;  // set to non-negative value to enable shift mode
-  // store n_padding (chatglm position ids)
-  for (int i = 0; i < bs; ++i) {
-    if (n_padding == NULL) {
-      ((int32_t*)b->data)[ROPE_PADDING_IDX + i] = 0;
-    } else {
-      ((int32_t*)b->data)[ROPE_PADDING_IDX + i] = *(n_padding + i);
-    }
-  }
-
-  ne_scratch_load(ctx);
-
-  /* what the diffrence of setting parameters in b->data and in op_parameters */
-  /* float and int are in different data ?? */
-  float params[] = {freq_base, freq_scale};
-  ne_set_op_params(result, &params, sizeof(params));
-
-  result->op = NE_OP_ROPE;
-  result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
-  result->src0 = a;
-  result->src1 = b;
-  result->opt[0] = cossin;
-
-  return result;
-}
-
-struct ne_tensor* ne_yarn_rope_impl(struct ne_context* ctx, struct ne_tensor* a, int n_past, int n_dims, int mode,
-                               int prompt_size, bool inplace, int n_keep, struct ne_tensor* cossin, int* n_padding,
                                bool padding_left, float freq_base, float freq_scale,
-                               int yarn_orig_ctx, float ext_factor, float attn_factor, float beta_fast, float beta_slow) {
+                               int yarn_orig_ctx, float ext_factor, float attn_factor,
+                               float beta_fast, float beta_slow) {
   NE_ASSERT(n_past >= 0 || n_keep >= 0);
   NE_ASSERT(padding_left);
   bool is_node = false;
@@ -3098,33 +3043,35 @@ struct ne_tensor* ne_yarn_rope_impl(struct ne_context* ctx, struct ne_tensor* a,
 
 struct ne_tensor* ne_rope(struct ne_context* ctx, struct ne_tensor* a, int n_past, int n_dims, int mode,
                           int prompt_size, float freq_base, float freq_scale) {
-  return ne_rope_impl(ctx, a, n_past, n_dims, mode, prompt_size, false, -1, NULL, NULL, true, freq_base, freq_scale);
+  return ne_rope_impl(ctx, a, n_past, n_dims, mode, prompt_size, false, -1, NULL, NULL, true, freq_base, freq_scale,
+                      0, 1.0f, 0.0f, 0.0f, 0.0f);
 }
 
 struct ne_tensor* ne_rope_inplace(struct ne_context* ctx, struct ne_tensor* a, int n_past, int n_dims, int mode,
                                   int prompt_size, float freq_base, float freq_scale) {
-  return ne_rope_impl(ctx, a, n_past, n_dims, mode, prompt_size, true, -1, NULL, NULL, true, freq_base, freq_scale);
+  return ne_rope_impl(ctx, a, n_past, n_dims, mode, prompt_size, true, -1, NULL, NULL, true, freq_base, freq_scale,
+                      0, 1.0f, 0.0f, 0.0f, 0.0f);
 }
 
 struct ne_tensor* ne_rope_shift_inplace(struct ne_context* ctx, struct ne_tensor* a, int n_shift, int n_dims, int mode,
                                         int prompt_size, int n_keep, struct ne_tensor* cossin, float freq_base,
                                         float freq_scale) {
   return ne_rope_impl(ctx, a, n_shift, n_dims, mode, prompt_size, true, n_keep, cossin, NULL, true, freq_base,
-                      freq_scale);
+                      freq_scale, 0, 1.0f, 0.0f, 0.0f, 0.0f);
 }
 
-struct ne_tensor* ne_yarn_rope_inplace(struct ne_context* ctx, struct ne_tensor* a, int n_past, int n_dims, int mode,
+struct ne_tensor* ne_rope_custom_inplace(struct ne_context* ctx, struct ne_tensor* a, int n_past, int n_dims, int mode,
                                   int prompt_size, float freq_base, float freq_scale,
                                   int yarn_orig_ctx, float ext_factor, float attn_factor, float beta_fast, float beta_slow) {
-  return ne_yarn_rope_impl(ctx, a, n_past, n_dims, mode, prompt_size, true, -1, NULL, NULL, true, freq_base, freq_scale,
+  return ne_rope_impl(ctx, a, n_past, n_dims, mode, prompt_size, true, -1, NULL, NULL, true, freq_base, freq_scale,
                         yarn_orig_ctx, ext_factor, attn_factor, beta_fast, beta_slow);
 }
 
-struct ne_tensor* ne_yarn_rope_shift_inplace(struct ne_context* ctx, struct ne_tensor* a, int n_shift, int n_dims, int mode,
+struct ne_tensor* ne_rope_custom_shift_inplace(struct ne_context* ctx, struct ne_tensor* a, int n_shift, int n_dims, int mode,
                                         int prompt_size, int n_keep, struct ne_tensor* cossin, float freq_base,
                                         float freq_scale,
                                         int yarn_orig_ctx, float ext_factor, float attn_factor, float beta_fast, float beta_slow) {
-  return ne_yarn_rope_impl(ctx, a, n_shift, n_dims, mode, prompt_size, true, n_keep, cossin, NULL, true, freq_base, freq_scale,
+  return ne_rope_impl(ctx, a, n_shift, n_dims, mode, prompt_size, true, n_keep, cossin, NULL, true, freq_base, freq_scale,
                       yarn_orig_ctx, ext_factor, attn_factor, beta_fast, beta_slow);
 }
 
@@ -3163,14 +3110,14 @@ struct ne_tensor* ne_rope_back(struct ne_context* ctx, struct ne_tensor* a, int 
 struct ne_tensor* ne_rope_with_padding(struct ne_context* ctx, struct ne_tensor* a, int n_past, int n_dims, int mode,
                                        int prompt_size, int* n_padding, float freq_base, float freq_scale) {
   return ne_rope_impl(ctx, a, n_past, n_dims, mode, prompt_size, false, -1, NULL, n_padding, true, freq_base,
-                      freq_scale);
+                      freq_scale, 0, 1.0f, 0.0f, 0.0f, 0.0f);
 }
 
 struct ne_tensor* ne_rope_with_padding_inplace(struct ne_context* ctx, struct ne_tensor* a, int n_past, int n_dims,
                                                int mode, int prompt_size, int* n_padding, float freq_base,
                                                float freq_scale) {
   return ne_rope_impl(ctx, a, n_past, n_dims, mode, prompt_size, true, -1, NULL, n_padding, true, freq_base,
-                      freq_scale);
+                      freq_scale, 0, 1.0f, 0.0f, 0.0f, 0.0f);
 }
 
 // ne_alibi
