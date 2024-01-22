@@ -237,7 +237,6 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
     //float hparams.rope_scaling_factor = 0.0f; where to put it?
     //int mode = (hparams.use_yarn == true) ? 0x8: 0x0;
     int mode = 0x8;
-    printf("n origi ctx = %d \n", hparams.original_max_position_embeddings);
 
     ne_set_name(Qcur, "Qcur");
     Qcur =

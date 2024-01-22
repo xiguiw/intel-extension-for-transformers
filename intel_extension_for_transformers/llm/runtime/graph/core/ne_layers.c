@@ -2994,6 +2994,8 @@ struct ne_tensor* ne_rope_impl(struct ne_context* ctx, struct ne_tensor* a, int 
 #ifdef DEBUG_INPUT_DATA
   printf("n_dim %d, mode %d, freq_base %.2f, freq_scale %.4f, orig_ctx %d\n",
          n_dims, mode, freq_base, freq_scale, yarn_orig_ctx, beta_fast, beta_slow);
+  printf("ext_factor = %.4f, attn_factor = %.4f\n", ext_factor, attn_factor);
+
 #endif
 
   struct ne_tensor* result = inplace ? ne_view_tensor(ctx, a) : ne_dup_tensor(ctx, a);
@@ -3044,20 +3046,20 @@ struct ne_tensor* ne_rope_impl(struct ne_context* ctx, struct ne_tensor* a, int 
 struct ne_tensor* ne_rope(struct ne_context* ctx, struct ne_tensor* a, int n_past, int n_dims, int mode,
                           int prompt_size, float freq_base, float freq_scale) {
   return ne_rope_impl(ctx, a, n_past, n_dims, mode, prompt_size, false, -1, NULL, NULL, true, freq_base, freq_scale,
-                      0, 1.0f, 0.0f, 0.0f, 0.0f);
+                      0, 0.0f, 1.0f, 0.0f, 0.0f);
 }
 
 struct ne_tensor* ne_rope_inplace(struct ne_context* ctx, struct ne_tensor* a, int n_past, int n_dims, int mode,
                                   int prompt_size, float freq_base, float freq_scale) {
   return ne_rope_impl(ctx, a, n_past, n_dims, mode, prompt_size, true, -1, NULL, NULL, true, freq_base, freq_scale,
-                      0, 1.0f, 0.0f, 0.0f, 0.0f);
+                      0, 0.0f, 1.0f, 0.0f, 0.0f);
 }
 
 struct ne_tensor* ne_rope_shift_inplace(struct ne_context* ctx, struct ne_tensor* a, int n_shift, int n_dims, int mode,
                                         int prompt_size, int n_keep, struct ne_tensor* cossin, float freq_base,
                                         float freq_scale) {
   return ne_rope_impl(ctx, a, n_shift, n_dims, mode, prompt_size, true, n_keep, cossin, NULL, true, freq_base,
-                      freq_scale, 0, 1.0f, 0.0f, 0.0f, 0.0f);
+                      freq_scale, 0, 0.0f, 1.0f, 0.0f, 0.0f);
 }
 
 struct ne_tensor* ne_rope_custom_inplace(struct ne_context* ctx, struct ne_tensor* a, int n_past, int n_dims, int mode,
@@ -3110,14 +3112,14 @@ struct ne_tensor* ne_rope_back(struct ne_context* ctx, struct ne_tensor* a, int 
 struct ne_tensor* ne_rope_with_padding(struct ne_context* ctx, struct ne_tensor* a, int n_past, int n_dims, int mode,
                                        int prompt_size, int* n_padding, float freq_base, float freq_scale) {
   return ne_rope_impl(ctx, a, n_past, n_dims, mode, prompt_size, false, -1, NULL, n_padding, true, freq_base,
-                      freq_scale, 0, 1.0f, 0.0f, 0.0f, 0.0f);
+                      freq_scale, 0, 0.0f, 1.0f, 0.0f, 0.0f);
 }
 
 struct ne_tensor* ne_rope_with_padding_inplace(struct ne_context* ctx, struct ne_tensor* a, int n_past, int n_dims,
                                                int mode, int prompt_size, int* n_padding, float freq_base,
                                                float freq_scale) {
   return ne_rope_impl(ctx, a, n_past, n_dims, mode, prompt_size, true, -1, NULL, n_padding, true, freq_base,
-                      freq_scale, 0, 1.0f, 0.0f, 0.0f, 0.0f);
+                      freq_scale, 0, 0.0f, 1.0f, 0.0f, 0.0f);
 }
 
 // ne_alibi
@@ -3508,7 +3510,7 @@ static void ne_compute_forward_dump_tensor(const struct ne_compute_params* param
     } break;
   }
   fclose(file);
-  //NE_ASSERT(false);
+  NE_ASSERT(false);
 }
 // ne_compute_forward_dup
 
@@ -8000,26 +8002,6 @@ static void ne_compute_forward_rope_f32(const struct ne_compute_params* params, 
 
   NE_ASSERT(("RoPE shift not supported!", !is_shift));
 
-#ifdef YARN_DUMP_TENSOR
-  static int count = 0;
-  if (count < 2)
-  {
-    count++;
-  }
-  else
-  {
-    NE_ASSERT(false);
-  }
-
-  printf("%s, %d, use_yarn %d\n", __func__, __LINE__, use_yarn);
-  char name[32];
-  memcpy(name, ne_get_name(src0), sizeof(ne_get_name(src0)));
-  strcat(name, "src0");
-  ne_set_name(src0, name);
-  printf("%s\n", name);
-  ne_compute_forward_dump_tensor(params, src0, dst);
-#endif
-
   NE_ASSERT(ne3 == bs);
 #ifdef DEBUG_INPUT_DATA
   printf("ne[3:0] %ld , %ld, %ld, %ld\n", ne3, ne2, ne1, ne0);
@@ -8033,27 +8015,21 @@ static void ne_compute_forward_rope_f32(const struct ne_compute_params* params, 
         if (ir++ < ir0) continue;
         if (ir > ir1) break;
 
-        float theta = 0.0;
-        float theta_base = 0.0;
-        if (use_yarn) {
-            theta_base = (float)p;
-        } else {
-            theta = freq_scale * (float)p;
-        }
+        float theta_base = (float)p;
 
         // only for glm when mode == 4
         if (is_glm) {
           const int64_t n_padding = ((int32_t*)src1->data)[ROPE_PARAMS_NUM + i3];
           // position ids
-          theta = MIN(MAX(p - n_padding, 0), prompt_size - 2 - n_padding);
+          theta_base = MIN(MAX(p - n_padding, 0), prompt_size - 2 - n_padding);
           float block_theta = MAX(p - (prompt_size - 2), 0);
           for (int64_t i0 = 0; i0 < ne0 / 4; i0++) {
-            const float cos_theta = cosf(theta);
-            const float sin_theta = sinf(theta);
+            const float cos_theta = cosf(theta_base);
+            const float sin_theta = sinf(theta_base);
             const float cos_block_theta = cosf(block_theta);
             const float sin_block_theta = sinf(block_theta);
 
-            theta *= theta_scale;
+            theta_base *= theta_scale;
             block_theta *= theta_scale;
 
             const float* const src = (float*)((char*)src0->data + i3 * nb03 + i2 * nb02 + i1 * nb01 + i0 * nb00);
@@ -8070,57 +8046,41 @@ static void ne_compute_forward_rope_f32(const struct ne_compute_params* params, 
             dst_data[n_dims / 2 * 3] = x2 * sin_block_theta + x3 * cos_block_theta;
           }
         } else if (!is_neox) {
-          if (!use_yarn) {
-            for (int64_t i0 = 0; i0 < ne0; i0 += 2) {
-                const float cos_theta = cosf(theta);
-                const float sin_theta = sinf(theta);
+          //printf("theta_base = %ld, freq_scale %.4f, ne0 %d\n", p, freq_scale, ne0);
+          for (int64_t i0 = 0; i0 < ne0; i0 += 2) {
+            float cos_theta, sin_theta;
+            rope_yarn(
+                     theta_base, freq_scale, corr_dims, i0, ext_factor, attn_factor, &cos_theta, &sin_theta
+            );
 
-                theta *= theta_scale;  // theta = i2 * theta_scale^(i0/2)
+            theta_base *= theta_scale;
 
-                const float* const src = (float*)((char*)src0->data + i3 * nb03 + i2 * nb02 + i1 * nb01 + i0 * nb00);
-                float* dst_data = (float*)((char*)dst->data + i3 * nb3 + i2 * nb2 + i1 * nb1 + i0 * nb0);
+            const float* const src = (float*)((char*)src0->data + i3 * nb03 + i2 * nb02 + i1 * nb01 + i0 * nb00);
+            float* dst_data = (float*)((char*)dst->data + i3 * nb3 + i2 * nb2 + i1 * nb1 + i0 * nb0);
 
-                const float x0 = src[0];
-                const float x1 = src[1];
+            const float x0 = src[0];
+            const float x1 = src[1];
 
-                dst_data[0] = x0 * cos_theta - x1 * sin_theta;
-                dst_data[1] = x0 * sin_theta + x1 * cos_theta;
-            }
-          } else {
-            /* nsfocus branch */
-            //printf("theta_base = %ld, freq_scale %.4f, ne0 %d\n", p, freq_scale, ne0);
-            for (int64_t i0 = 0; i0 < ne0; i0 += 2) {
-                float cos_theta, sin_theta;
-                rope_yarn(
-                    theta_base, freq_scale, corr_dims, i0, ext_factor, attn_factor, &cos_theta, &sin_theta
-                );
-
-                // zeta scaling for xPos only: NOT update in ne_layer but in llama.cpp ggml.c
-                //float zeta = xpos_base != 0.0f ? powf((i0 + 0.4f * ne0) / (1.4f * ne0), p / xpos_base) : 1.0f;
-                //if (xpos_down) zeta = 1.0f / zeta;
-
-                theta_base *= theta_scale;
-
-                const float* const src = (float*)((char*)src0->data + i3 * nb03 + i2 * nb02 + i1 * nb01 + i0 * nb00);
-                float* dst_data = (float*)((char*)dst->data + i3 * nb3 + i2 * nb2 + i1 * nb1 + i0 * nb0);
-
-                const float x0 = src[0];
-                const float x1 = src[1];
-
-                dst_data[0] = x0 * cos_theta - x1 * sin_theta;
-                dst_data[1] = x0 * sin_theta + x1 * cos_theta;
-            }
+            dst_data[0] = x0 * cos_theta - x1 * sin_theta;
+            dst_data[1] = x0 * sin_theta + x1 * cos_theta;
           }
         } else {
           // TODO: this is probably wrong, but I can't figure it out ..
           // ref:
           // https://github.com/huggingface/transformers/blob/main/src/transformers/models/gpt_neox/modeling_gpt_neox.py#LL251C1-L294C28
+          theta_base = theta_base * freq_scale;
+
           for (int64_t ib = 0; ib < ne0 / n_dims; ++ib) {
             for (int64_t ic = 0; ic < n_dims; ic += 2) {
-              const float cos_theta = cosf(theta);
-              const float sin_theta = sinf(theta);
+              // simplified from `(ib * n_dims + ic) * inv_ndims`
+              float cur_rot = inv_ndims * ic - ib;
 
-              theta *= theta_scale;
+              float cos_theta, sin_theta;
+              rope_yarn(
+                        theta_base, freq_scale, corr_dims, (int)cur_rot, ext_factor, attn_factor, &cos_theta, &sin_theta
+              );
+
+              theta_base *= theta_scale;
 
               const int64_t i0 = ib * n_dims + ic / 2;
 
@@ -8139,17 +8099,6 @@ static void ne_compute_forward_rope_f32(const struct ne_compute_params* params, 
     }
   }
 
-#ifdef YARN_DUMP_TENSOR
-  static int test = 0;
-  test++;
-  printf("%s, %d\n", __func__, __LINE__);
-  printf("before yarn_dump_tensor\n");
-  if (dst->name == NULL) {
-    ne_set_name(dst, 'dst');
-  }
-  ne_compute_forward_dump_tensor(params, dst, dst);
-  //NE_ASSERT(false);
-#endif
 }
 
 static void ne_compute_forward_rope_f16(const struct ne_compute_params* params, const struct ne_tensor* src0,
