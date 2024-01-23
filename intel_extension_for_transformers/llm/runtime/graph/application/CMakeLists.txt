@@ -68,6 +68,7 @@ compile_quant(quant_chatglm2  quant_model.cpp chatglm2  chatglm2)
 compile_quant(quant_baichuan  quant_model.cpp baichuan  baichuan)
 compile_quant(quant_mistral   quant_model.cpp mistral   llama)
 compile_quant(quant_qwen   quant_model.cpp qwen   qwen)
+compile_quant(quant_llama_yarn quant_model.cpp llama_yarn     llama)
 
 # all models running
 if (NE_PYTHON_API)
@@ -91,6 +92,7 @@ set(mymap_polyglot 13)
 set(mymap_mistral 14)
 set(mymap_qwen 15)
 set(mymap_whisper 16)
+set(mymap_llama_yarn 17)
 
 
 function(compile_run TARGET MAIN_CPP MAIN_PY MODEL_NAME MODEL_LIB)

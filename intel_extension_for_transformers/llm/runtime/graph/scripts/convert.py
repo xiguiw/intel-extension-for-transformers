@@ -25,6 +25,9 @@ model_maps = {"gpt_neox": "gptneox", "gpt_bigcode": "starcoder"}
 def convert_model(model, outfile, outtype):
     config = AutoConfig.from_pretrained(model, trust_remote_code=True)
     model_type = model_maps.get(config.model_type, config.model_type)
+    if model_type == "llama" and config.rope_scaling != None:
+        if (config.rope_scaling["type"] == "yarn"):
+            model_type = "llama_yarn"
 
     gpt_model = 'gptq' in str(model).lower()
     if gpt_model:

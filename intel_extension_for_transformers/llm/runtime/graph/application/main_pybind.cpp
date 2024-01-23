@@ -658,6 +658,10 @@ PYBIND11_MODULE(mistral_cpp, m)
 
 PYBIND11_MODULE(qwen_cpp, m)
 
+#elif MODEL_NAME_ID == 17
+
+PYBIND11_MODULE(llama_yarn_cpp, m)
+
 #endif
 {
   m.doc() = "cpp model python binding";
