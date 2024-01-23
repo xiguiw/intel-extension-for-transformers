@@ -2991,13 +2991,6 @@ struct ne_tensor* ne_rope_impl(struct ne_context* ctx, struct ne_tensor* a, int 
     is_node = true;
   }
 
-#ifdef DEBUG_INPUT_DATA
-  printf("n_dim %d, mode %d, freq_base %.2f, freq_scale %.4f, orig_ctx %d\n",
-         n_dims, mode, freq_base, freq_scale, yarn_orig_ctx, beta_fast, beta_slow);
-  printf("ext_factor = %.4f, attn_factor = %.4f\n", ext_factor, attn_factor);
-
-#endif
-
   struct ne_tensor* result = inplace ? ne_view_tensor(ctx, a) : ne_dup_tensor(ctx, a);
 
   ne_scratch_save(ctx);
@@ -7932,8 +7925,6 @@ void ggml_rope_yarn_corr_dims(
   NE_TENSOR_LOCALS(int64_t, ne, dst, ne);   \
   NE_TENSOR_LOCALS(size_t, nb, dst, nb);
 
-//#define DEBUG_INPUT_DATA
-//#define YARN_DUMP_TENSOR
 static void ne_compute_forward_rope_f32(const struct ne_compute_params* params, const struct ne_tensor* src0,
                                         const struct ne_tensor* src1, struct ne_tensor* dst) {
   if (params->type == NE_TASK_INIT || params->type == NE_TASK_FINALIZE) {
@@ -7957,13 +7948,6 @@ static void ne_compute_forward_rope_f32(const struct ne_compute_params* params, 
   const int64_t mode = ((int32_t*)src1->data)[ROPE_MODE_IDX];
   const int64_t prompt_size = ((int32_t*)src1->data)[ROPE_PROMPTSIZE_IDX];
   const int64_t n_keep = ((int32_t*)src1->data)[ROPE_NKEEP_IDX];
-
-#ifdef DEBUG_INPUT_DATA
-  printf("n_dim %d, mode %d, freq_base %.2f, freq_scale %.4f, orig_ctx %d, beta fast %f, beta slow %f\n",
-         n_dims, mode, freq_base, freq_scale, n_orig_ctx, beta_fast, beta_slow);
-  printf("ext_factor %.2f, attn_factor %.2f\n",
-         ext_factor, attn_factor);
-#endif
 
   assert(n_past >= 0);
 
@@ -8003,11 +7987,7 @@ static void ne_compute_forward_rope_f32(const struct ne_compute_params* params, 
   NE_ASSERT(("RoPE shift not supported!", !is_shift));
 
   NE_ASSERT(ne3 == bs);
-#ifdef DEBUG_INPUT_DATA
-  printf("ne[3:0] %ld , %ld, %ld, %ld\n", ne3, ne2, ne1, ne0);
-  printf("src nb[3:0] %ld , %ld, %ld, %ld\n", nb03, nb02, nb01, nb00);
-  printf("dst nb[3:0] %ld , %ld, %ld, %ld\n", nb3, nb2, nb1, nb0);
-#endif
+
   for (int64_t i3 = 0; i3 < ne3; i3++) {
     for (int64_t i2 = (skip ? n_past : 0); i2 < ne2; i2++) {
       const int64_t p = skip ? i2 : n_past + i2;
