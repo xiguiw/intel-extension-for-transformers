@@ -28,21 +28,18 @@ Functions
 
 
 
-.. py:class:: BaseModel
+.. py:class:: BaseModel(model_name, task='chat')
 
 
 
 
    A base class for LLM.
 
-   .. py:method:: match(model_path: str)
+   .. py:method:: match()
 
-      Check if the provided model_path matches the current model.
+      Check if the provided model_name matches the current model.
 
-      :param model_path: Path to a model.
-      :type model_path: str
-
-      :returns: True if the model_path matches, False otherwise.
+      :returns: True if the model_name matches, False otherwise.
       :rtype: bool
 
 
@@ -63,9 +60,11 @@ Functions
           "ipex_int8": False,
           "use_cache": True,
           "peft_path": "/path/to/peft",
-          "use_deepspeed": False
-          "hf_access_token": "user's huggingface access token"
-          "assistant_model": "assistant model name to speed up inference"
+          "use_deepspeed": False,
+          "hf_access_token": "user's huggingface access token",
+          "assistant_model": "assistant model name to speed up inference",
+          "use_vllm": "whether to use vllm for serving",
+          "vllm_engine_params": "vllm engine parameters if use_vllm is true",
       }
 
 
@@ -105,7 +104,7 @@ Functions
       :param config: Configuration for conversation.
 
 
-   .. py:method:: get_default_conv_template(model_path: str) -> fastchat.conversation.Conversation
+   .. py:method:: get_default_conv_template() -> fastchat.conversation.Conversation
 
       Get the default conversation template for the given model path.
 
@@ -127,6 +126,11 @@ Functions
 
       :returns: A conversation template.
       :rtype: Conversation
+
+
+   .. py:method:: set_customized_system_prompts(system_prompts, model_path: str, task: str = '')
+
+      Override the system prompts of the model path and the task.
 
 
    .. py:method:: register_plugin_instance(plugin_name, instance)

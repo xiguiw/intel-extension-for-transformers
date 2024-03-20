@@ -141,9 +141,10 @@ Compared to normal quantization like W8A8, weight only quantization is probably 
 ```python
 # Python code
 from intel_extension_for_transformers.neural_chat import build_chatbot, PipelineConfig
-loading_config = LoadingModelConfig(use_llm_runtime=True)
+from intel_extension_for_transformers.transformers import RtnConfig
+loading_config = LoadingModelConfig(use_neural_speed=True)
 config = PipelineConfig(
-    optimization_config=WeightOnlyQuantConfig(compute_dtype="int8", weight_dtype="int4_fullrange")
+    optimization_config=RtnConfig(bits=4, compute_dtype="int8", weight_dtype="int4_fullrange")
 )
 chatbot = build_chatbot(config)
 response = chatbot.predict("Tell me about Intel Xeon Scalable Processors.")
@@ -156,9 +157,10 @@ response = chatbot.predict("Tell me about Intel Xeon Scalable Processors.")
 # Python code
 from intel_extension_for_transformers.neural_chat import build_chatbot, PipelineConfig
 from intel_extension_for_transformers.neural_chat.config import LoadingModelConfig
-loading_config = LoadingModelConfig(use_llm_runtime=True)
+from intel_extension_for_transformers.transformers import RtnConfig
+loading_config = LoadingModelConfig(use_neural_speed=True)
 config = PipelineConfig(
-    optimization_config=WeightOnlyQuantConfig(compute_dtype="int8", weight_dtype="int4"),
+    optimization_config=RtnConfig(bits=4, compute_dtype="int8", weight_dtype="int4"),
     loading_config=loading_config
 )
 chatbot = build_chatbot(config)
@@ -183,17 +185,16 @@ finetune_model(finetune_cfg)
 
 For detailed fine-tuning instructions, please refer to the documentation below.
 
-[NeuralChat Fine-tuning](./examples/finetuning/instruction/README.html)
+[NeuralChat Fine-tuning](../examples/finetuning/instruction/README.html)
 
-[Direct Preference Optimization](./examples/finetuning/dpo_pipeline/README.html)
+[Direct Preference Optimization](../examples/finetuning/dpo_pipeline/README.html)
 
-[Reinforcement Learning from Human Feedback](./examples/finetuning/ppo_pipeline/README.html)
+[Reinforcement Learning from Human Feedback](../examples/finetuning/ppo_pipeline/README.html)
 
-[Multi-Modal](./examples/finetuning/multi_modal/README.html)
+[Multi-Modal](../examples/finetuning/multi_modal/README.html)
 
-[How to train Intel/neural-chat-7b-v3-1 on Intel Gaudi2](./examples/finetuning/finetune_neuralchat_v3/README.html)
+[How to train Intel/neural-chat-7b-v3-1 on Intel Gaudi2](../examples/finetuning/finetune_neuralchat_v3/README.html)
 
-[Text-To-Speech (TTS) model finetuning](./examples/finetuning/tts/README.html)
+[Text-To-Speech (TTS) model finetuning](../examples/finetuning/tts/README.html)
 
-And NeuralChat also provides Docker file tailored for easy fine-tuning. Explore details in [finetuning with Docker](./docker/finetuning/README.html).
-
+And NeuralChat also provides Docker file tailored for easy fine-tuning. Explore details in [finetuning with Docker](../docker/finetuning/README.html).

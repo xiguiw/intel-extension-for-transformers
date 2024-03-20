@@ -5,7 +5,7 @@
 # Introduction
 Large language models (LLMs) have shown exceptional performance in various natural language processing tasks, establishing them as essential tools for understanding and generating language. These models absorb extensive world knowledge from their vast training datasets, enabling them to produce fluent and coherent responses to user queries without external data resources. However, despite the remarkable breadth of knowledge large language models gain during training, they face limitations in accessing up-to-date information and certain domain-specific data. This limitation can lead to a significant concern: the tendency of large language models to 'hallucinate' or create fictitious content in their responses.
 
-This hallucination problem primarily arises from two factors: (1) LLMs are predominantly trained using data from the Internet, which limits their exposure to specific, domain-focused information; and (2) LLMs mainly rely on the training corpus for information extraction. These models remain unaware of events occurring post-training, which can be particularly problematic for topics that change daily. Two methods are recongized as effective method for model hallucination problems, [Finetuning the LLM on task-specific datasets](https://arxiv.org/abs/2311.08401) and [Retrieval-Augmented Generation (RAG)](https://arxiv.org/abs/2212.10560). However, finetuning a LLM is impractical for most users due to it requires high-quality datasets, labor-intensive data annotation, and substantial computational resources. Also, it is challenging to collect and maintain an extensive, up-to-date knowledge corpus. Therefore, we propose an economically efficient alternative based on RAG. It retrieves relevant documents from a local database to serve as the reference to enhance the accuracy and reliability of the generated results.
+This hallucination problem primarily arises from two factors: (1) LLMs are predominantly trained using data from the Internet, which limits their exposure to specific, domain-focused information; and (2) LLMs mainly rely on the training corpus for information extraction. These models remain unaware of events occurring post-training, which can be particularly problematic for topics that change daily. Two methods are recognized as effective method for model hallucination problems, [Finetuning the LLM on task-specific datasets](https://arxiv.org/abs/2311.08401) and [Retrieval-Augmented Generation (RAG)](https://arxiv.org/abs/2212.10560). However, finetuning a LLM is impractical for most users due to it requires high-quality datasets, labor-intensive data annotation, and substantial computational resources. Also, it is challenging to collect and maintain an extensive, up-to-date knowledge corpus. Therefore, we propose an economically efficient alternative based on RAG. It retrieves relevant documents from a local database to serve as the reference to enhance the accuracy and reliability of the generated results.
 
 Inspired by the prevent chatbot framework [langchain](https://github.com/langchain-ai/langchain), [Llama-Index](https://github.com/run-llama/llama_index) and [haystack](https://github.com/deepset-ai/haystack), our NeuralChat API offers an easy way to create and utilize chatbot models while integrating RAG. Our API provides an easy to use extension for langchain users as well as a convenient deployment code for the general user. Without too much learning effort, the user can build their own RAG-based chatbot with their documents. The details about our langchain extension feature could be see [here](#langchain-extension).
 
@@ -35,16 +35,16 @@ To ensure a smooth experience, we've made sure this plugin is compatible with co
 | xlsx  | ['Questions', 'Answers']<br>['question', 'answer', 'link']<br>['context', 'link'] |
 | csv  | ['question', 'correct_answer'] |
 | json/jsonl  | {'content':xxx, 'link':xxx}|
-| txt  | / |
-| html  | / |
-| markdown  | / |
-| word  | / |
-| pdf  | / |
+| txt  | No format required |
+| html  | No format required |
+| markdown  | No format required |
+| word  | No format required |
+| pdf  | No format required |
 
 # Usage
-The most convenient way to use is this plugin is via our `build_chatbot` api as introduced in the [example code](https://github.com/intel/intel-extension-for-transformers/tree/main/intel_extension_for_transformers/neural_chat/examples/plugins/retrieval). The user could refer to it for a simple test. 
+Before using RAG in NeuralChat, please install the necessary dependencies in [requirements.txt](https://github.com/intel/intel-extension-for-transformers/blob/main/intel_extension_for_transformers/neural_chat/pipeline/plugins/retrieval/requirements.txt) to avoid the import errors. The most convenient way to use is this plugin is via our `build_chatbot` api as introduced in the [example code](https://github.com/intel/intel-extension-for-transformers/tree/main/intel_extension_for_transformers/neural_chat/examples/plugins/retrieval). The user could refer to it for a simple test. 
 
-We support multiple file formats for retrieval, including unstructured file formats such as pdf, docx, html, txt, and markdown, as well as structured file formats like jsonl and xlsx. For structured file formats, they must adhere to predefined structures.
+We support multiple file formats for retrieval, including unstructured file formats such as pdf, docx, html, txt, and markdown, as well as structured file formats like jsonl/json, csv, xlsx. For structured file formats, they must adhere to predefined structures. We also support to upload the knowledge base via a http web link.
 
 In the case of jsonl files, they should be formatted as dictionaries, such as: {'content':xxx, 'link':xxx}. The support for xlsx files is specifically designed for Question-Answer (QA) tasks. Users can input QA pairs for retrieval. Therefore, the table's header should include items labeled as "Question" and "Answer". The reference files could be found [here](https://github.com/intel/intel-extension-for-transformers/tree/main/intel_extension_for_transformers/neural_chat/assets/docs).
 
@@ -81,13 +81,17 @@ Below are the description for the available parameters in `agent_QA`,
 | vector_database  | str | The vector database for constructing the knowledge base. |"Chroma", "Qdrant"|
 | input_path   | str | The path of the file/folder/link of the content to formulate the knowledge base |-|
 | embedding_model  | str | The name or path for the text embedding model |-|
-| response_template  | str | Default response when there is no available relevent documents for RAG |-|
+| response_template  | str | Default response when there is no available relevant documents for RAG |-|
 | mode  | str | The RAG behavior for different use case. Please check [here](#rag-mode) |"accuracy", "general"|
-| retrieval_type   | str | The type of the retriever. Please check [here](#retrievers) for more details  | "default", "child_parent"|
+| retrieval_type   | str | The type of the retriever. Please check [here](#retrievers) for more details  | "default", "child_parent", "bm25"|
 | process  | bool | Whether to split the long documents into small chucks. The size of each chuck is defined by `max_chuck_size` and `min_chuck_size`|True, False|
 | max_chuck_size  | int | The max token length for a single chuck in the knowledge base |-|
 | min_chuck_size  | int | The min token length for a single chuck in the knowledge base |-|
 | append  | bool | Whether the new knowledge will be append to the existing knowledge base or directly load the existing knowledge base |True, False|
+| polish  | bool | Whether to polish the input query before processing |True, False|
+| enable_rerank   | bool | Whether to enable retrieval then rerank pipeline |True, False|
+| reranker_model   | str | The name of the reranker model from the Huggingface or a local path |-|
+| top_n   | int | The return number of the reranker model |-|
 
 More retriever- and vectorstore-related parameters please check [here](#langchain-extension)
 
@@ -124,7 +128,7 @@ For the langchain users, it can be easily imported and used by replacing the ori
 from langchain_community.llms.huggingface_pipeline import HuggingFacePipeline
 from langchain.chains import RetrievalQA
 from langchain_core.vectorstores import VectorStoreRetriever
-from intel_extension_for_transformers.langchain.vectorstores import Chroma
+from intel_extension_for_transformers.langchain_community.vectorstores import Chroma
 retriever = VectorStoreRetriever(vectorstore=Chroma(...))
 retrievalQA = RetrievalQA.from_llm(llm=HuggingFacePipeline(...), retriever=retriever)
 ```
@@ -153,7 +157,7 @@ For the langchain users, it can be easily imported and used by replacing the ori
 from langchain_community.llms.huggingface_pipeline import HuggingFacePipeline
 from langchain.chains import RetrievalQA
 from langchain_core.vectorstores import VectorStoreRetriever
-from intel_extension_for_transformers.langchain.vectorstores import Qdrant
+from intel_extension_for_transformers.langchain_community.vectorstores import Qdrant
 retriever = VectorStoreRetriever(vectorstore=Qdrant(...))
 retrievalQA = RetrievalQA.from_llm(llm=HuggingFacePipeline(...), retriever=retriever)
 ```
@@ -167,7 +171,7 @@ We've chosen VectorStoreRetriever as the default retriever. This decision aligns
 Our approach ensures that users have access to versatile and effective retrieval tools, tailored to a variety of requirements and preferences within the system.
 
 ### VectorStoreRetriever
-We've maintained most of the retrieval behaviors consistent with langchain, but we've also introduced additional content processing steps. These enhancements are specifically designed to better meet our needs for source-based retrieval. The user can select this retriever by:
+We've maintained most of the retrieval behaviors consistent with langchain. The user can select this retriever by:
 ```python
 plugins.retrieval.args["retrieval_type"]="default"
 ```
@@ -185,17 +189,17 @@ plugins.retrieval.args["search_kwargs"]=xxx
 ```
 
 If "search_type"="similarity":
->search_kwargs={"k"=xxx}
+>search_kwargs={"k":xxx}
 
 "k" is the number of the returned most similar documents.
 
 If "search_type"="mmr":
->search_kwargs={"k"=xxx, "fetch_k"=xxx, "lamabda_mult"=xxx}
+>search_kwargs={"k":xxx, "fetch_k":xxx, "lamabda_mult":xxx}
 
 "k" is the number of the returned most similar documents. "fetch_k" is the number of Documents to fetch to pass to MMR algorithm. "Lamabda_mult" is a number between 0 and 1 that determines the degree of diversity among the results with 0 corresponding to maximum diversity and 1 to minimum diversity. Defaults to 0.5.
 
 If "search_type"="similarity_score_threshold":
->search_kwargs={"k"=xxx, "score_threshold"=xxx}
+>search_kwargs={"k":xxx, "score_threshold":xxx}
 
 "k" is the number of the returned most similar documents. "score_threshold" is the similar score threshold for the retrieved documents.
 
@@ -232,7 +236,7 @@ If "search_type"="mmr":
 
 This new retriever is also available for langchain users. Below is a toy example that using our `ChildParentRetriever` in the langchain framework:
 ```python
-from intel_extension_for_transformers.langchain.retrievers import ChildParentRetriever
+from intel_extension_for_transformers.langchain_community.retrievers import ChildParentRetriever
 from langchain.vectorstores import Chroma
 retriever = ChildParentRetriever(vectorstore=Chroma(documents=child_documents), parentstore=Chroma(documents=parent_documents), search_type=xxx, search_kwargs={...})
 docs=retriever.get_relevant_documents("Intel")
